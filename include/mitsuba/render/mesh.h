@@ -169,6 +169,16 @@ public:
                                           SurfaceInteraction3f &si,
                                           Mask active = true) const override;
 
+#if defined(MTS_ENABLE_OPTIX)
+    virtual SurfaceInteraction3f
+    differentiable_surface_interaction(const Ray3f &ray,
+                                       const SurfaceInteraction3f &si,
+                                       Mask active = true) const override;
+
+    virtual Point3f p_attached(const SurfaceInteraction3f &si, 
+                               Mask active = true) const override;
+#endif
+
     virtual std::pair<Vector3f, Vector3f>
     normal_derivative(const SurfaceInteraction3f &si,
                       bool shading_frame = true, Mask active = true) const override;
@@ -200,7 +210,7 @@ public:
      *    barycentric coordinates
      */
     MTS_INLINE std::tuple<Mask, Float, Float, Float>
-    ray_intersect_triangle(const ScalarIndex &index, const Ray3f &ray,
+    ray_intersect_triangle(const UInt32 &index, const Ray3f &ray,
                            identity_t<Mask> active = true) const {
         auto fi = face_indices(index);
 

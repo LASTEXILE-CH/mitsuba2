@@ -173,6 +173,18 @@ public:
     virtual void fill_surface_interaction(const Ray3f &ray, const Float *cache,
                                           SurfaceInteraction3f &si, Mask active = true) const;
 
+#if defined(MTS_ENABLE_OPTIX)
+    /// Compute differentiable intersection data from optix intersection
+    virtual SurfaceInteraction3f
+    differentiable_surface_interaction(const Ray3f &ray,
+                                       const SurfaceInteraction3f &si,
+                                       Mask active = true) const;
+
+    /// Compute "attached" differentiable positions
+    virtual Point3f p_attached(const SurfaceInteraction3f &si,
+                               Mask active = true) const;
+#endif
+
     /**
      * \brief Test for an intersection and return detailed information
      *
@@ -438,6 +450,8 @@ ENOKI_CALL_SUPPORT_TEMPLATE_BEGIN(mitsuba::Shape)
     ENOKI_CALL_SUPPORT_METHOD(eval_attribute)
     ENOKI_CALL_SUPPORT_METHOD(eval_attribute_1)
     ENOKI_CALL_SUPPORT_METHOD(eval_attribute_3)
+    ENOKI_CALL_SUPPORT_METHOD(differentiable_surface_interaction)
+    ENOKI_CALL_SUPPORT_METHOD(p_attached)
     ENOKI_CALL_SUPPORT_GETTER_TYPE(emitter, m_emitter, const typename Class::Emitter *)
     ENOKI_CALL_SUPPORT_GETTER_TYPE(sensor, m_sensor, const typename Class::Sensor *)
     ENOKI_CALL_SUPPORT_GETTER_TYPE(bsdf, m_bsdf, const typename Class::BSDF *)
