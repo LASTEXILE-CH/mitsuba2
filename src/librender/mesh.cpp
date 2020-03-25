@@ -675,9 +675,8 @@ MTS_VARIANT void Mesh<Float, Spectrum>::fill_surface_interaction(const Ray3f & /
 
 #if defined(MTS_ENABLE_OPTIX)
 MTS_VARIANT typename Mesh<Float, Spectrum>::SurfaceInteraction3f
-Mesh<Float, Spectrum>::differentiable_surface_interaction(const Ray3f &ray, 
-                                                          const SurfaceInteraction3f &si_, 
-                                                          Mask active) const {
+Mesh<Float, Spectrum>::differentiable_surface_interaction(
+    const Ray3f &ray, const SurfaceInteraction3f &si_, bool attach_p, Mask active) const {
 
     SurfaceInteraction3f si(si_);
 
@@ -686,13 +685,17 @@ Mesh<Float, Spectrum>::differentiable_surface_interaction(const Ray3f &ray,
     auto si_diff = ray_intersect_triangle(si.prim_index, ray, active);
 
     // Replace the data by differentiable data
-    Mask active_its = std::get<0>(si_diff);
+    Mask active_its          = std::get<0>(si_diff);
     masked(si.t, active_its) = std::get<3>(si_diff);
-    masked(si.p, active_its) = ray.o + si.t*ray.d;
 
     // get differentiable barycentric coordinates
     Float b1 = std::get<1>(si_diff);
     Float b2 = std::get<2>(si_diff);
+
+    // TODO: merge with fill_surface_interaction
+    // Float cache[2] = { b1, b2 };
+    // fill_surface_interaction(ray, cache, si, active);
+
     Float b0 = 1.f - b1 - b2;
 
     auto fi = face_indices(si.prim_index, active);
@@ -706,7 +709,7 @@ Mesh<Float, Spectrum>::differentiable_surface_interaction(const Ray3f &ray,
 
     // Face normal
     Normal3f n = normalize(cross(dp0, dp1));
-    masked(si.n, active) = n;
+    si.n[active] = n;
 
     // Texture coordinates (if available)
     auto [dp_du, dp_dv] = coordinate_system(n);
@@ -726,8 +729,8 @@ Mesh<Float, Spectrum>::differentiable_surface_interaction(const Ray3f &ray,
 
         Mask valid = neq(det, 0.f);
 
-        masked(dp_du, valid) = fmsub( duv1.y(), dp0, duv0.y() * dp1) * inv_det;
-        masked(dp_dv, valid) = fnmadd(duv1.x(), dp0, duv0.x() * dp1) * inv_det;
+        dp_du[valid] = fmsub( duv1.y(), dp0, duv0.y() * dp1) * inv_det;
+        dp_dv[valid] = fnmadd(duv1.x(), dp0, duv0.x() * dp1) * inv_det;
     }
     si.uv[active] = uv;
 
@@ -740,15 +743,22 @@ Mesh<Float, Spectrum>::differentiable_surface_interaction(const Ray3f &ray,
         n = normalize(n0 * b0 + n1 * b1 + n2 * b2);
     }
 
-    masked(si.sh_frame.n, active) = n;
+    si.sh_frame.n[active] = n;
 
     // Tangents
-    masked(si.dp_du, active) = dp_du;
-    masked(si.dp_dv, active) = dp_dv;
-    
+    si.dp_du[active] = dp_du;
+    si.dp_dv[active] = dp_dv;
+
+
     masked(si.sh_frame.s, active) = normalize(
         fnmadd(si.sh_frame.n, dot(si.sh_frame.n, si.dp_du), si.dp_du));
     masked(si.sh_frame.t, active) = cross(si.sh_frame.n, si.sh_frame.s);
+
+    // TODO comment this
+    if(!attach_p)
+        masked(si.p, active_its) = ray.o + si.t * ray.d;
+    else
+        masked(si.p, active_its)= p0 * detach(b0) + p1 * detach(b1) + p2 * detach(b2);
 
     return si;
 }
@@ -794,6 +804,21 @@ Mesh<Float, Spectrum>::normal_derivative(const SurfaceInteraction3f &si, bool sh
     Normal3f n0 = vertex_normal(fi[0], active),
              n1 = vertex_normal(fi[1], active),
              n2 = vertex_normal(fi[2], active);
+
+    // Vector3f rel = si.p - p0,
+    //          du  = p1 - p0,
+    //          dv  = p2 - p0;
+
+    // /* Solve a least squares problem to determine
+    //    the UV coordinates within the current triangle */
+    // Float b1  = dot(du, rel), b2 = dot(dv, rel),
+    //       a11 = dot(du, du), a12 = dot(du, dv),
+    //       a22 = dot(dv, dv),
+    //       inv_det = rcp(a11 * a22 - a12 * a12);
+
+    // Float u = fmsub (a22, b1, a12 * b2) * inv_det,
+    //       v = fnmadd(a12, b1, a11 * b2) * inv_det,
+    //       w = 1.f - u - v;
 
     /* Now compute the derivative of "normalize(u*n1 + v*n2 + (1-u-v)*n0)"
        with respect to [u, v] in the local triangle parameterization.
