@@ -181,23 +181,32 @@ public:
                       && local.x()*local.x() + local.y()*local.y() <= 1;
     }
 
-    void fill_surface_interaction(const Ray3f &ray_, const Float *cache,
-                                  SurfaceInteraction3f &si_out, Mask active) const override {
+    SurfaceInteraction3f fill_surface_interaction(const Ray3f &ray,
+                                                  const Float *cache,
+                                                  const UInt32 &cache_indices,
+                                                  SurfaceInteraction3f si,
+                                                  Mask active) const override {
         MTS_MASK_ARGUMENT(active);
 
-#if !defined(MTS_ENABLE_EMBREE)
-        Float local_x = cache[0];
-        Float local_y = cache[1];
-#else
-        ENOKI_MARK_USED(cache);
-        Ray3f ray     = m_to_object.transform_affine(ray_);
-        Float t       = -ray.o.z() * ray.d_rcp.z();
-        Point3f local = ray(t);
-        Float local_x = local.x();
-        Float local_y = local.y();
-#endif
+        // TODO: make si differentiable w.r.t. shape parameters if necessary
 
-        SurfaceInteraction3f si(si_out);
+        Float local_x, local_y;
+        if constexpr (is_cuda_array_v<Float>){
+            local_x = gather<Float>(cache[0], cache_indices, active);
+            local_y = gather<Float>(cache[1], cache_indices, active);
+        } else {
+#if !defined(MTS_ENABLE_EMBREE)
+            local_x = cache[0];
+            local_y = cache[1];
+#else
+            ENOKI_MARK_USED(cache);
+            Ray3f ray     = m_to_object.transform_affine(ray_);
+            Float t       = -ray.o.z() * ray.d_rcp.z();
+            Point3f local = ray(t);
+            local_x = local.x();
+            local_y = local.y();
+#endif
+        }
 
         Float r = norm(Point2f(local_x, local_y)),
               inv_r = rcp(r);
@@ -208,16 +217,16 @@ public:
         Float cos_phi = select(neq(r, 0.f), local_x * inv_r, 1.f),
               sin_phi = select(neq(r, 0.f), local_y * inv_r, 0.f);
 
-        si.dp_du      = m_to_world * Vector3f( cos_phi, sin_phi, 0.f);
-        si.dp_dv      = m_to_world * Vector3f(-sin_phi, cos_phi, 0.f);
+        si.dp_du[active] = m_to_world * Vector3f(cos_phi, sin_phi, 0.f);
+        si.dp_dv[active] = m_to_world * Vector3f(-sin_phi, cos_phi, 0.f);
 
-        si.n          = m_frame.n;
-        si.sh_frame.n = m_frame.n;
-        si.uv         = Point2f(r, v);
-        si.p          = ray_(si.t);
-        si.time       = ray_.time;
+        si.n[active]            = m_frame.n;
+        si.sh_frame.n[active]   = m_frame.n;
+        si.uv[active]           = Point2f(r, v);
+        si.p[active]            = ray_(si.t);
+        masked(si.time, active) = ray_.time;
 
-        si_out[active] = si;
+        return si;
     }
 
     std::pair<Vector3f, Vector3f> normal_derivative(const SurfaceInteraction3f & /*si*/,

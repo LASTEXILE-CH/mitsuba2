@@ -2251,14 +2251,14 @@ BB10_3:
 	.param .b64 param1;
 	st.param.b64	[param1+0], %rd5;
 	.param .b32 retval0;
-	call.uni (retval0), 
-	vprintf, 
+	call.uni (retval0),
+	vprintf,
 	(
-	param0, 
+	param0,
 	param1
 	);
 	ld.param.b32	%r2, [retval0+0];
-	
+
 	//{
 	}// Callseq End 0
 	ret;
