@@ -445,7 +445,17 @@ Scene<Float, Spectrum>::ray_intersect_gpu(const Ray3f &ray_, HitComputeMode mode
         set_slices(ray, ray_count);
         set_slices(active, ray_count);
 
-        SurfaceInteraction3f si = empty<SurfaceInteraction3f>(ray_count);
+        SurfaceInteraction3f si;
+        if (mode == HitComputeMode::Least) {
+            si = empty<SurfaceInteraction3f>(1); // this is needed for virtual calls
+            si.t = empty<Float>(ray_count);
+            si.p = empty<Point3f>(ray_count);
+            si.uv = empty<Point2f>(ray_count);
+            si.prim_index = empty<UInt32>(ray_count);
+            si.shape = empty<ShapePtr>(ray_count);
+        } else {
+            si = empty<SurfaceInteraction3f>(ray_count);
+        }
 
         // DEBUG mode: Explicitly instantiate `si` with NaN values.
         // As the integrator should only deal with the lanes of `si` for which
@@ -552,6 +562,7 @@ Scene<Float, Spectrum>::ray_intersect_gpu(const Ray3f &ray_, HitComputeMode mode
         return si;
     } else {
         ENOKI_MARK_USED(ray_);
+        ENOKI_MARK_USED(mode);
         ENOKI_MARK_USED(active);
         Throw("ray_intersect_gpu() should only be called in GPU mode.");
     }

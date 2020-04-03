@@ -325,10 +325,10 @@ public:
                 // Sample the light integral at each active shading point.
                 // Several samples are used for estimating discontinuities
                 // in light visibility.
-                auto [emitter, emitter_pdf] = scene->sample_emitter(
+                auto [emitter_ls, emitter_pdf] = scene->sample_emitter(
                     si, samplePair1D(active_e, sampler), active_e);
 
-                Mask is_envmap = emitter->is_environment() && active_e;
+                Mask is_envmap = emitter_ls->is_environment() && active_e;
 
                 Point3f position_discontinuity(0.f);
                 UInt32 hits(0);
@@ -337,18 +337,19 @@ public:
                 std::vector<Spectrum> emitter_val_ls(m_dc_light_samples);
                 std::vector<Mask> is_occluded_ls(m_dc_light_samples);
 
-                auto [ds_ls_main, e_tmp] = emitter->sample_direction(
-                    si, samplePair2D(active_e, sampler), active_e);
+                auto ds_ls_main = emitter_ls->sample_direction(si, samplePair2D(active_e, sampler), active_e).first;
                 Frame<Float> frame_main_ls(ds_ls_main.d);
 
                 for (size_t ls = 0; ls < m_dc_light_samples; ls++) {
-
-                    std::tie(ds_ls[ls], emitter_val_ls[ls]) = emitter->sample_direction(
-                        si, samplePair2D(active_e, sampler), active_e);
+                    std::tie(ds_ls[ls], emitter_val_ls[ls]) =
+                        emitter_ls->sample_direction(
+                            si, samplePair2D(active_e, sampler), active_e);
 
                     if (m_use_convolution_envmap) {
-                        Vector3f sample_ls = warp::square_to_von_mises_fisher<Float>(
-                            sample2D(active_e, sampler), m_kappa_conv_envmap);
+                        Vector3f sample_ls =
+                            warp::square_to_von_mises_fisher<Float>(
+                                sample2D(active_e, sampler),
+                                m_kappa_conv_envmap);
 
                         // Update with the pdf of the convolution kernel
                         ds_ls[ls].pdf[is_envmap] = warp::square_to_von_mises_fisher_pdf<Float>(
@@ -361,8 +362,8 @@ public:
 
                     // Check masking for active rays
                     Ray3f ray_ls(si.p, ds_ls[ls].d, math::RayEpsilon<Float> * (1.f + hmax(abs(si.p))),
-                                 ds_ls[ls].dist * (1.f - math::ShadowEpsilon<Float>),
-                                 si.time, si.wavelengths);
+                                ds_ls[ls].dist * (1.f - math::ShadowEpsilon<Float>),
+                                si.time, si.wavelengths);
                     ray_ls.maxt[is_envmap] = math::Infinity<Float>;
 
                     auto si_ls = scene->ray_intersect(ray_ls, HitComputeMode::Least, active_ls);
@@ -374,7 +375,7 @@ public:
 
                     if (m_use_convolution_envmap) {
                         // The contribution is radiance * kernel / ds_ls_main.pdf / kernel (pdf)
-                        emitter_val_ls[ls][is_envmap] = emitter->eval(si_ls, is_envmap) / ds_ls_main.pdf;
+                        emitter_val_ls[ls][is_envmap] = emitter_ls->eval(si_ls, is_envmap) / ds_ls_main.pdf;
                     }
 
                     // The contribution is 0 when the light is not visible
@@ -424,7 +425,7 @@ public:
                         ray_ls, HitComputeMode::Differentiable,
                         visible_and_hit);
 
-                    Spectrum e_val_reparam = emitter->eval(si_ls, visible_and_hit) / detach(ds_ls[ls].pdf);
+                    Spectrum e_val_reparam = emitter_ls->eval(si_ls, visible_and_hit) / detach(ds_ls[ls].pdf);
 
                     if (m_use_convolution_envmap) {
                         e_val_reparam[visible_and_hit && is_envmap] *= ds_ls[ls].pdf / ds_ls_main.pdf;
@@ -434,7 +435,7 @@ public:
 
                     if (m_use_convolution_envmap) {
                         // Update emitter pdf for MIS
-                        Float pdf_emitter = emitter->pdf_direction(si, ds_ls[ls], is_envmap);
+                        Float pdf_emitter = emitter_ls->pdf_direction(si, ds_ls[ls], is_envmap);
                         ds_ls[ls].pdf[is_envmap] = detach(pdf_emitter);
                     }
 
@@ -499,8 +500,7 @@ public:
 
                 Float component_sample = samplePair1D(active, sampler);
 
-                auto [sample_main_bs, bsdf_val_main_bs] = bsdf->sample(ctx, si, component_sample,
-                                                                       samplePair2D(active, sampler), active);
+                auto sample_main_bs = bsdf->sample(ctx, si, component_sample, samplePair2D(active, sampler), active).first;
 
                 // TODO: BSDFs should fill the `sampled_roughness` field
                 Mask convolution = Mask(m_use_convolution) && active
@@ -519,14 +519,13 @@ public:
                 // convolution of the bsdf. Only the first one is
                 // used for the light paths.
                 for (size_t bs = 0; bs < m_dc_bsdf_samples; bs++) {
-
+                    Vector2f samples = sample2D(active, sampler);
                     // Convolution: sample a vmf lobe
-                    Vector3f sample_bs = warp::square_to_von_mises_fisher<Float>(sample2D(active, sampler), m_kappa_conv);
+                    Vector3f sample_bs = warp::square_to_von_mises_fisher<Float>(samples, m_kappa_conv);
                     sample_bs = frame_main_bs.to_world(sample_bs);
 
                     // Otherwise: must be uncorrelated, but can sample the same component
-                    auto [sample_bs_noconv, bsdf_val_bs] = bsdf->sample(ctx, si, component_sample,
-                                                                        sample2D(active, sampler), active);
+                    auto [sample_bs_noconv, bsdf_val_bs] = bsdf->sample(ctx, si, component_sample, samples, active);
 
                     ds_bs[bs] = select(convolution, sample_bs, sample_bs_noconv.wo);
                 }
