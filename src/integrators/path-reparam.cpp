@@ -107,7 +107,7 @@ template <typename Float, typename Spectrum>
 class PathReparamIntegrator : public MonteCarloIntegrator<Float, Spectrum> {
 public:
     MTS_IMPORT_BASE(MonteCarloIntegrator, m_max_depth, m_rr_depth)
-    MTS_IMPORT_TYPES(Scene, Sampler, Emitter, EmitterPtr, BSDF, BSDFPtr)
+    MTS_IMPORT_TYPES(Scene, Sampler, Medium, Emitter, EmitterPtr, BSDF, BSDFPtr)
 
     PathReparamIntegrator(const Properties &props) : Base(props) {
         m_dc_light_samples = props.size_("dc_light_samples", 4);
@@ -148,7 +148,8 @@ public:
     std::pair<Spectrum, Mask> sample(const Scene *scene,
                                      Sampler *sampler,
                                      const RayDifferential3f &primary_ray_,
-                                     Float * /*aovs*/,
+                                     const Medium * /* medium */,
+                                     Float * /* aovs */,
                                      Mask active_primary) const override {
 
         RayDifferential3f primary_ray = primary_ray_;

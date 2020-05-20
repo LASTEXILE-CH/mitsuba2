@@ -181,7 +181,7 @@ public:
                       && local.x()*local.x() + local.y()*local.y() <= 1;
     }
 
-    SurfaceInteraction3f fill_surface_interaction(const Ray3f &ray,
+    SurfaceInteraction3f fill_surface_interaction(const Ray3f &ray_,
                                                   const Float *cache,
                                                   const UInt32 &cache_indices,
                                                   SurfaceInteraction3f si,

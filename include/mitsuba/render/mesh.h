@@ -164,11 +164,12 @@ public:
     barycentric_coordinates(const SurfaceInteraction3f &si,
                             Mask active = true) const;
 
-    virtual void fill_surface_interaction(const Ray3f &ray,
-                                          const Float *cache,
-                                          const UInt32 &cache_indices,
-                                          SurfaceInteraction3f &si,
-                                          Mask active = true) const override;
+    virtual SurfaceInteraction3f
+    fill_surface_interaction(const Ray3f &ray,
+                             const Float *cache,
+                             const UInt32 &cache_indices,
+                             SurfaceInteraction3f si,
+                             Mask active = true) const override;
 
     virtual std::pair<Point3f, Normal3f>
     differentiable_position(const SurfaceInteraction3f &si,
