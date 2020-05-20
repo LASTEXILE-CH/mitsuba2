@@ -500,7 +500,9 @@ Scene<Float, Spectrum>::ray_intersect_gpu(const Ray3f &ray_, HitComputeMode mode
             // Out: Hit flag
             nullptr,
             // top_object
-            s.accel
+            s.accel,
+            // fill_surface_interaction
+            mode == HitComputeMode::Default
         };
 
         cuda_memcpy_to_device(s.params, &params, sizeof(OptixParams));
@@ -510,9 +512,6 @@ Scene<Float, Spectrum>::ray_intersect_gpu(const Ray3f &ray_, HitComputeMode mode
             width <<= 1;
             height >>= 1;
         }
-
-        // TODO
-        // rt_check(rtVariableSet1i(s.fill_surface_interaction, (mode == HitComputeMode::Default ? 1 : 0)));
 
         OptixResult rt = optixLaunch(
             s.pipeline,
@@ -611,7 +610,9 @@ Scene<Float, Spectrum>::ray_test_gpu(const Ray3f &ray_, Mask active) const {
             // Out: Hit flag
             hit.data(),
             // top_object
-            s.accel
+            s.accel,
+            // fill_surface_interaction
+            false
         };
 
         cuda_memcpy_to_device(s.params, &params, sizeof(OptixParams));
@@ -621,9 +622,6 @@ Scene<Float, Spectrum>::ray_test_gpu(const Ray3f &ray_, Mask active) const {
             width <<= 1;
             height >>= 1;
         }
-
-        // TODO
-        rt_check(rtVariableSet1i(s.fill_surface_interaction, 0));
 
         OptixResult rt = optixLaunch(
             s.pipeline,
