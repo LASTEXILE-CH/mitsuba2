@@ -249,8 +249,10 @@ struct SurfaceInteraction : Interaction<Float_, Spectrum_> {
                                   const void *cache, // TODO should be Float* but can't because of ENOKI_STRUCT_SUPPORT (pointer to reference issue)
                                   Mask active = true) {
         ShapePtr target = select(neq(instance, nullptr), instance, shape);
-        auto si = target->fill_surface_interaction(
-            ray, (Float *)cache, arange<UInt32>(slices(ray)), *this, active);
+
+        auto si = target->fill_surface_interaction(ray, (Float *) cache,
+                                                   arange<UInt32>(slices(ray)),
+                                                   *this, is_valid() && active);
 
         // Keep this->t == INF if interaction isn't valid
         masked(t, is_valid()) = si.t;

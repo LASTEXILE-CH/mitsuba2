@@ -503,6 +503,8 @@ public:
 
                 auto sample_main_bs = bsdf->sample(ctx, si, component_sample, samplePair2D(active, sampler), active).first;
 
+                active &= sample_main_bs.pdf > 0.f;
+
                 // TODO: BSDFs should fill the `sampled_roughness` field
                 Mask convolution = Mask(m_use_convolution) && active
                     && sample_main_bs.sampled_roughness > m_conv_threshold;
@@ -510,8 +512,6 @@ public:
                 if (any(has_flag(sample_main_bs.sampled_type, BSDFFlags::Delta)))
                     Log(Error, "This pluggin does not support perfectly specular reflections"
                         " and transmissions. Rough materials should be used instead.");
-
-                active &= sample_main_bs.pdf > 0.f;
 
                 Frame<Float> frame_main_bs(sample_main_bs.wo);
                 std::vector<Vector3f> ds_bs(m_dc_bsdf_samples);
@@ -566,7 +566,6 @@ public:
                 // Reuse one direction sampled from either the BSDF or the convolution kernel
                 // around the main direction.
                 sample_bs.wo = ds_bs[0]; // Reuse the first one, could be any of them
-
 
                 // Apply the differentiable rotation
                 // Warning, the direction must be detached such that it follows the discontinuities

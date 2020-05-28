@@ -8,6 +8,22 @@ from mitsuba.python.test.util import fresolver_append_path
 mitsuba.set_variant("scalar_rgb")
 from mitsuba.core import ScalarTransform4f
 
+# TODO should be replaced by enoki functions
+def ravel(buf, dim = 3):
+    from mitsuba.core import UInt32, Point2f, Point3f
+    idx = dim * UInt32.arange(int(len(buf) / dim))
+    if dim == 2:
+        return Point2f(ek.gather(buf, idx), ek.gather(buf, idx + 1))
+    elif dim == 3:
+        return Point3f(ek.gather(buf, idx), ek.gather(buf, idx + 1), ek.gather(buf, idx + 2))
+
+# TODO should be replaced by enoki functions
+def unravel(source, target, dim = 3):
+    from mitsuba.core import UInt32
+    idx = UInt32.arange(ek.slices(source))
+    for i in range(dim):
+        ek.scatter(target, source[i], dim * idx + i)
+
 def write_gradient_image(grad, name):
     """Convert signed floats to blue/red gradient exr image"""
     from mitsuba.core import Bitmap
@@ -156,23 +172,16 @@ plane_mesh = {
 
 def update_vertex_buffer(scene, object_name, diff_trafo):
     """Apply the given transformation to mesh vertex positions and call update scene"""
-    from mitsuba.core import UInt32, Point3f
     from mitsuba.python.util import traverse
 
     params = traverse(scene)
-    vertex_positions_buf = params[object_name + '.vertex_positions_buf']
 
-    idx = UInt32.arange(params[object_name + '.vertex_count'])
-    vertex_positions = Point3f(ek.gather(vertex_positions_buf, 3 * idx + 0),
-                                ek.gather(vertex_positions_buf, 3 * idx + 1),
-                                ek.gather(vertex_positions_buf, 3 * idx + 2))
+    vertex_positions_buf = params[object_name + '.vertex_positions_buf']
+    vertex_positions = ravel(vertex_positions_buf)
 
     vertex_positions_t = diff_trafo.transform_point(vertex_positions)
 
-    ek.scatter(vertex_positions_buf, vertex_positions_t.x, 3 * idx + 0)
-    ek.scatter(vertex_positions_buf, vertex_positions_t.y, 3 * idx + 1)
-    ek.scatter(vertex_positions_buf, vertex_positions_t.z, 3 * idx + 2)
-
+    unravel(vertex_positions_t, vertex_positions_buf)
     params[object_name + '.vertex_positions_buf'] = vertex_positions_buf
 
     # Update the scene
@@ -276,7 +285,7 @@ def test02_object_position(variant_gpu_autodiff_rgb):
 
 
 # TODO fix this test
-# @pytest.mark.skip
+@pytest.mark.skip
 @pytest.mark.slow
 def test03_envmap(variant_gpu_autodiff_rgb):
     from mitsuba.core import Float, Transform4f, ScalarVector3f, ScalarTransform4f
