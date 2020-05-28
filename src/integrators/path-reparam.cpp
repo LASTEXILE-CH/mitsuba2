@@ -24,7 +24,7 @@ NAMESPACE_BEGIN(mitsuba)
 .. _integrator-pathreparam:
 
 Differentiable path tracer (:monosp:`pathreparam`)
--------------------------------------------
+--------------------------------------------------
 
 .. pluginparameters::
 
@@ -79,7 +79,8 @@ Differentiable path tracer (:monosp:`pathreparam`)
    - Disable reparameterization after several scattering events. (Default: 10)
 
 This integrator implements the reparameterization technique described in the
-article "Reparameterizing discontinuous integrands for differentiable rendering".
+`article <https://rgl.epfl.ch/publications/Loubet2019Reparameterizing>`_
+"Reparameterizing discontinuous integrands for differentiable rendering".
 It is based on the integrator :ref:`path <integrator-path>` and it applies
 reparameterizations to rendering integrals in order to account for discontinuities
 when pixel values are differentiated using GPU modes and the Python API.

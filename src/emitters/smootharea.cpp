@@ -12,7 +12,7 @@ NAMESPACE_BEGIN(mitsuba)
 .. _emitter-smootharea:
 
 Smooth area light (:monosp:`smootharea`)
----------------------------
+----------------------------------------
 
 .. pluginparameters::
 
